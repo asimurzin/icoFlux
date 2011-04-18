@@ -256,16 +256,11 @@ def main_standalone( argc, argv ):
 
     
 #--------------------------------------------------------------------------------------
-import sys, os
 from Foam import FOAM_VERSION
 if FOAM_VERSION( "<=", "010401" ):
    if __name__ == "__main__" :
+      import sys, os
       argv = sys.argv
-      if len( argv ) > 1 and argv[ 1 ] == "-test":
-         argv = None
-         test_dir= os.path.join( os.environ[ "PYFOAM_TESTING_DIR" ],'cases', 'local', 'r1.4.1-dev', 'icoFoam' )
-         argv = [ __file__, test_dir, 'cavity' ]
-         pass
       os._exit( main_embedded( len( argv ), argv ) )
       pass
 else:
