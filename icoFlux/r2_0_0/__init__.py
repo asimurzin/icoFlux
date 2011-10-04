@@ -25,46 +25,42 @@
 
 
 #---------------------------------------------------------------------------
-from Foam import man
+from Foam import man, ref
 
 
 #---------------------------------------------------------------------------
 def createFields( runTime, mesh ):
-    from Foam.OpenFOAM import ext_Info, nl
-    ext_Info() << "Reading transportProperties\n"
+    ref.ext_Info() << "Reading transportProperties\n"
 
-    from Foam.OpenFOAM import IOobject, word, fileName
-    transportProperties = man.IOdictionary( man.IOobject( word( "transportProperties" ),
-                                                          fileName( runTime.constant() ),
+    transportProperties = man.IOdictionary( man.IOobject( ref.word( "transportProperties" ),
+                                                          ref.fileName( runTime.constant() ),
                                                           mesh,
-                                                          IOobject.MUST_READ_IF_MODIFIED,
-                                                          IOobject.NO_WRITE ) )
+                                                          ref.IOobject.MUST_READ_IF_MODIFIED,
+                                                          ref.IOobject.NO_WRITE ) )
 
-    from Foam.OpenFOAM import dimensionedScalar
-    nu = dimensionedScalar( transportProperties.lookup( word( "nu" ) ) ) 
+    nu = ref.dimensionedScalar( transportProperties.lookup( ref.word( "nu" ) ) ) 
 
-    ext_Info() << "Reading field p\n" << nl
-    p = man.volScalarField( man.IOobject( word( "p" ),
-                                          fileName( runTime.timeName() ), 
+    ref.ext_Info() << "Reading field p\n" << ref.nl
+    p = man.volScalarField( man.IOobject( ref.word( "p" ),
+                                          ref.fileName( runTime.timeName() ), 
                                           mesh,
-                                          IOobject.MUST_READ,
-                                          IOobject.AUTO_WRITE ), mesh );
+                                          ref.IOobject.MUST_READ,
+                                          ref.IOobject.AUTO_WRITE ), mesh );
 
 
-    ext_Info() << "Reading field U\n" << nl
-    U = man.volVectorField( man.IOobject( word( "U" ),
-                                          fileName( runTime.timeName() ),
+    ref.ext_Info() << "Reading field U\n" << ref.nl
+    U = man.volVectorField( man.IOobject( ref.word( "U" ),
+                                          ref.fileName( runTime.timeName() ),
                                           mesh,
-                                          IOobject.MUST_READ,
-                                          IOobject.AUTO_WRITE ), mesh );
+                                          ref.IOobject.MUST_READ,
+                                          ref.IOobject.AUTO_WRITE ), mesh );
 
     phi = man.createPhi( runTime, mesh, U )
 
     pRefCell = 0
     pRefValue = 0.0
    
-    from Foam.finiteVolume import setRefCell
-    pRefCell, pRefValue = setRefCell( p, mesh.solutionDict().subDict( word( "PISO" ) ), pRefCell, pRefValue )
+    pRefCell, pRefValue = ref.setRefCell( p, mesh.solutionDict().subDict( ref.word( "PISO" ) ), pRefCell, pRefValue )
 
     return transportProperties, nu, p, U, phi, pRefCell, pRefValue
 
@@ -72,8 +68,7 @@ def createFields( runTime, mesh ):
 #--------------------------------------------------------------------------------------
 def main_standalone( argc, argv ):
 
-    from Foam.OpenFOAM.include import setRootCase
-    args = setRootCase( argc, argv )
+    args = ref.setRootCase( argc, argv )
 
     runTime = man.createTime( args )
 
@@ -81,39 +76,33 @@ def main_standalone( argc, argv ):
 
     transportProperties, nu, p, U, phi, pRefCell, pRefValue = createFields( runTime, mesh )
 
-    from Foam.finiteVolume.cfdTools.general.include import initContinuityErrs
-    cumulativeContErr = initContinuityErrs()
+    cumulativeContErr = ref.initContinuityErrs()
     
-    from Foam.OpenFOAM import ext_Info, nl
-    ext_Info() << "\nStarting time loop\n"
+    ref.ext_Info() << "\nStarting time loop\n"
 
     while runTime.loop() :
-        ext_Info() << "Time = " <<  runTime.timeName() << nl << nl
+        ref.ext_Info() << "Time = " <<  runTime.timeName() << ref.nl << ref.nl
 
-        from Foam.finiteVolume.cfdTools.general.include import readPISOControls
-        piso, nCorr, nNonOrthCorr, momentumPredictor, transonic, nOuterCorr = readPISOControls( mesh )
+        piso, nCorr, nNonOrthCorr, momentumPredictor, transonic, nOuterCorr = ref.readPISOControls( mesh )
 
-        from Foam.finiteVolume.cfdTools.general.include import CourantNo
-        CoNum, meanCoNum = CourantNo( mesh, phi, runTime )
+        CoNum, meanCoNum = ref.CourantNo( mesh, phi, runTime )
 
         UEqn = man.fvm.ddt( U ) + man.fvm.div( phi, U ) - man.fvm.laplacian( nu, U )
 
-        from Foam.finiteVolume import solve
-        solve( UEqn == -man.fvc.grad( p ) )
+        ref.solve( UEqn == -man.fvc.grad( p ) )
 
         # --- PISO loop
 
         for corr in range( nCorr ) :
             rUA = 1.0 / UEqn.A()
-            from Foam import fvc, fvm
+            
             U().ext_assign( rUA * UEqn.H() )
-            phi().ext_assign( ( fvc.interpolate( U ) & mesh.Sf() ) + fvc.ddtPhiCorr( rUA, U, phi ) )
+            phi().ext_assign( ( ref.fvc.interpolate( U ) & mesh.Sf() ) + ref.fvc.ddtPhiCorr( rUA, U, phi ) )
 
-            from Foam.finiteVolume import adjustPhi
-            adjustPhi( phi, U, p )
+            ref.adjustPhi( phi, U, p )
 
             for nonOrth in range( nNonOrthCorr + 1 ) :
-                pEqn = ( fvm.laplacian( rUA, p ) == fvc.div( phi ) )
+                pEqn = ( ref.fvm.laplacian( rUA, p ) == ref.fvc.div( phi ) )
 
                 pEqn.setReference( pRefCell, pRefValue ) 
                 pEqn.solve()                             
@@ -124,22 +113,21 @@ def main_standalone( argc, argv ):
                 
                 pass
             
-            from Foam.finiteVolume.cfdTools.incompressible import continuityErrs
-            cumulativeContErr = continuityErrs( mesh, phi, runTime, cumulativeContErr )
+            cumulativeContErr = ref.ContinuityErrs( phi, runTime, mesh, cumulativeContErr )
 
-            U().ext_assign( U() - rUA * fvc.grad( p ) )
+            U().ext_assign( U() - rUA * ref.fvc.grad( p ) )
             U.correctBoundaryConditions()    
 
             pass
 
         runTime.write()    
         
-        ext_Info() << "ExecutionTime = " << runTime.elapsedCpuTime() << " s" << \
-                      "  ClockTime = " << runTime.elapsedClockTime() << " s" << nl << nl
+        ref.ext_Info() << "ExecutionTime = " << runTime.elapsedCpuTime() << " s" << \
+                      "  ClockTime = " << runTime.elapsedClockTime() << " s" << ref.nl << ref.nl
 
         pass
 
-    ext_Info() << "End\n"
+    ref.ext_Info() << "End\n"
 
     import os
     return os.EX_OK
@@ -155,8 +143,8 @@ if FOAM_REF_VERSION( ">=", "020000" ):
       pass
    pass
 else:
-   from Foam.OpenFOAM import ext_Info
-   ext_Info()<< "\nTo use this solver, It is necessary to SWIG OpenFoam1.6 \n "     
+   ref.ext_Info()<< "\nTo use this solver, It is necessary to SWIG OpenFoam2.0.0 \n "
+   pass
     
 
 
