@@ -96,8 +96,8 @@ def main_standalone( argc, argv ):
         for corr in range( nCorr ) :
             rUA = 1.0 / UEqn.A()
             
-            U().ext_assign( rUA * UEqn.H() )
-            phi().ext_assign( ( ref.fvc.interpolate( U ) & mesh.Sf() ) + ref.fvc.ddtPhiCorr( rUA, U, phi ) )
+            U <<= rUA * UEqn.H()
+            phi <<= ( ref.fvc.interpolate( U ) & mesh.Sf() ) + ref.fvc.ddtPhiCorr( rUA, U, phi )
 
             ref.adjustPhi( phi, U, p )
 
@@ -108,14 +108,14 @@ def main_standalone( argc, argv ):
                 pEqn.solve()                             
 
                 if nonOrth == nNonOrthCorr:
-                    phi().ext_assign( phi() - pEqn.flux() )
+                    phi -= pEqn.flux()
                     pass
                 
                 pass
             
             cumulativeContErr = ref.ContinuityErrs( phi, runTime, mesh, cumulativeContErr )
 
-            U().ext_assign( U() - rUA * ref.fvc.grad( p ) )
+            U -= rUA * ref.fvc.grad( p )
             U.correctBoundaryConditions()    
 
             pass
