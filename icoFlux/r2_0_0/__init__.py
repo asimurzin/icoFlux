@@ -96,8 +96,8 @@ def main_standalone( argc, argv ):
         for corr in range( nCorr ) :
             rUA = 1.0 / UEqn.A()
             
-            U <<= rUA * UEqn.H()
-            phi <<= ( ref.fvc.interpolate( U ) & mesh.Sf() ) + ref.fvc.ddtPhiCorr( rUA, U, phi )
+            U << rUA * UEqn.H()
+            phi << ( ref.fvc.interpolate( U ) & mesh.Sf() ) + ref.fvc.ddtPhiCorr( rUA, U, phi )
 
             ref.adjustPhi( phi, U, p )
 
