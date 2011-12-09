@@ -25,6 +25,7 @@
 
 
 #---------------------------------------------------------------------------
+from Foam import ref 
 class solver( object ):
     def __init__( self, runTime, U, p, phi, transportProperties ):
         self.runTime_ = runTime
@@ -38,85 +39,78 @@ class solver( object ):
         self.pressureRes_ = 0.0
         self.velocityRes_ = 0.0
         
-        from Foam.finiteVolume import setRefCell
-        from Foam.OpenFOAM import word
-        self.pRefCell_, self.pRefValue_ = setRefCell( self.p_, 
-                                                      self.mesh_.solutionDict().subDict( word( "PISO" ) ),
-                                                      self.pRefCell_,
-                                                      self.pRefValue_ )
+        self.pRefCell_, self.pRefValue_ = ref.setRefCell( self.p_, 
+                                                          self.mesh_.solutionDict().subDict( ref.word( "PISO" ) ),
+                                                          self.pRefCell_,
+                                                          self.pRefValue_ )
 
         pass
     
     
     #-----------------------------------------------------------------------
     def step( self ):
-        from Foam.OpenFOAM import ext_Info, nl
         if self.runTime_.end():
-            ext_Info() << "Reached end time.  Exiting" << nl
+            ref.ext_Info() << "Reached end time.  Exiting" << ref.nl
             return
         
         self.runTime_.increment()
                 
         # Read transport properties
-        from Foam.OpenFOAM import dimensionedScalar, word
-        nu = dimensionedScalar( self.transportProperties_.lookup( word( "nu" ) ) )
+        nu = ref.dimensionedScalar( self.transportProperties_.lookup( ref.word( "nu" ) ) )
                 
         if self.mesh_.nInternalFaces():
             SfUfbyDelta = self.mesh_.deltaCoeffs()*self.phi_.mag()
             CoNum = ( SfUfbyDelta / self.mesh_.magSf() ).ext_max().value() * self.runTime_.deltaT().value()
             meanCoNum = ( SfUfbyDelta.sum() / self.mesh_.magSf().sum() ).value() * self.runTime_.deltaT().value()
             
-            ext_Info() << "Courant Number mean: " << meanCoNum << " max: " << CoNum << nl
+            ref.ext_Info() << "Courant Number mean: " << meanCoNum << " max: " << CoNum << ref.nl
             pass
 
         # Read controls
-        piso = self.mesh_.solutionDict().subDict( word( "PISO" ) )
-        from Foam.OpenFOAM import readInt        
-        nCorr = readInt( piso.lookup( word( "nCorrectors" ) ) )
+        piso = self.mesh_.solutionDict().subDict( ref.word( "PISO" ) )
+        nCorr = ref.readInt( piso.lookup( ref.word( "nCorrectors" ) ) )
                 
         nNonOrthCorr = 0
-        if piso.found( word( "nNonOrthogonalCorrectors" ) ):
-            nNonOrthCorr = readInt( piso.lookup( word( "nNonOrthogonalCorrectors" ) ) )
+        if piso.found( ref.word( "nNonOrthogonalCorrectors" ) ):
+            nNonOrthCorr = ref.readInt( piso.lookup( ref.word( "nNonOrthogonalCorrectors" ) ) )
             pass
            
-        from Foam import fvm, fvc
-        UEqn = fvm.ddt( self.U_ ) + fvm.div( self.phi_, self.U_ ) - fvm.laplacian( nu, self.U_ )
+        UEqn = ref.fvm.ddt( self.U_ ) + ref.fvm.div( self.phi_, self.U_ ) - ref.fvm.laplacian( nu, self.U_ )
         
-        from Foam.finiteVolume import solve
-        self.velocityRes_ = solve( UEqn == -fvc.grad( self.p_ ) ).initialResidual()
+        self.velocityRes_ = ref.solve( UEqn == -ref.fvc.grad( self.p_ ) ).initialResidual()
                 
         # --- PISO loop
                 
         for corr in range( nCorr ):
             rUA = 1.0 / UEqn.A()
                     
-            self.U_.ext_assign( rUA * UEqn.H() )
-            self.phi_.ext_assign( ( fvc.interpolate( self.U_ ) & self.mesh_.Sf() ) + fvc.ddtPhiCorr( rUA, self.U_, self.phi_) )
+            self.U_<<  rUA * UEqn.H()
+            self.phi_<<  ( ref.fvc.interpolate( self.U_ ) & self.mesh_.Sf() ) + ref.fvc.ddtPhiCorr( rUA, self.U_, self.phi_)
                     
 #           adjustPhi(phi_, U_, p_);
                     
             for nonOrth in range( nNonOrthCorr +1 ):
-                pEqn =  fvm.laplacian( rUA, self.p_ ) == fvc.div( self.phi_ )
+                pEqn =  ref.fvm.laplacian( rUA, self.p_ ) == ref.fvc.div( self.phi_ )
                 
                 pEqn.setReference( self.pRefCell_, self.pRefValue_);
                 self.pressureRes_ = pEqn.solve().initialResidual()
                 
                 if nonOrth == nNonOrthCorr:
-                   self.phi_.ext_assign( self.phi_ - pEqn.flux() )
+                   self.phi_ -= pEqn.flux()
                    pass
                 pass 
                     
             # Continuity errors
-            contErr = fvc.div( self.phi_ )
+            contErr = ref.fvc.div( self.phi_ )
                     
             sumLocalContErr = self.runTime_.deltaT().value() * contErr.mag().weightedAverage( self.mesh_.V() ).value() 
                    
             globalContErr = self.runTime_.deltaT().value() * contErr.weightedAverage( self.mesh_.V() ).value()
                     
-            ext_Info() << "time step continuity errors : sum local = " << sumLocalContErr << ", global = " << globalContErr << nl
+            ref.ext_Info() << "time step continuity errors : sum local = " << sumLocalContErr << ", global = " << globalContErr << ref.nl
                     
             # Correct velocity
-            self.U_.ext_assign( self.U_ - rUA * fvc.grad( self.p_ ) )
+            self.U_ -= rUA * ref.fvc.grad( self.p_ )
             self.U_.correctBoundaryConditions()
              
             pass
