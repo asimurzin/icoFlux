@@ -44,7 +44,7 @@ if FOAM_BRANCH_VERSION( "dev", "==", "010500" ):
 
 
 #-------------------------------------------------------------------------------------------------
-if FOAM_REF_VERSION( ">=", "010600" ):
+if FOAM_REF_VERSION( ">=", "010600" ) and FOAM_REF_VERSION( "<=", "010701" ):
     from icoFlux.r1_6 import *
     pass
 
@@ -59,7 +59,8 @@ if FOAM_BRANCH_VERSION( "dev", ">=", "010600" ):
 if FOAM_REF_VERSION( ">=", "020000" ):
     from icoFlux.r2_0_0 import *
     pass
-    
+
+
 #--------------------------------------------------------------------------------------
 def entry_point():
     try:
